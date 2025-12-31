@@ -51,25 +51,77 @@ const bot = new Client({
 });
 bot.login(TOKEN);
 
-// --- DATABASE SCHEMAS ---
+// ============================================================================
+// [DATABASE SCHEMAS] - SYNCED WITH BOT v82.6.10
+// ============================================================================
 
+// 1. SHARED SCHEMAS (Must match index.js exactly)
 const UserSchema = new mongoose.Schema({
     user_id: { type: String, required: true, unique: true },
     balance: { type: Number, default: 0 },
-    warnings: { type: Number, default: 0 },
+    last_daily: { type: Date, default: new Date(0) },
+    cook_count_week: { type: Number, default: 0 },
+    cook_count_total: { type: Number, default: 0 },
+    deliver_count_week: { type: Number, default: 0 },
+    deliver_count_total: { type: Number, default: 0 },
+    vip_until: { type: Date, default: new Date(0) },
     is_perm_banned: { type: Boolean, default: false },
     service_ban_until: { type: Date, default: null },
-    vip_until: { type: Date, default: new Date(0) }
+    double_stats_until: { type: Date, default: new Date(0) },
+    warnings: { type: Number, default: 0 }
 });
-const User = mongoose.model('User', UserSchema);
 
+const OrderSchema = new mongoose.Schema({
+    order_id: String,
+    user_id: String,
+    guild_id: String,
+    channel_id: String,
+    status: { type: String, default: 'pending' }, 
+    item: String,
+    is_vip: { type: Boolean, default: false },
+    is_super: { type: Boolean, default: false },
+    created_at: { type: Date, default: Date.now },
+    chef_name: String,
+    chef_id: String,
+    deliverer_id: String,
+    delivery_started_at: Date, 
+    ready_at: Date,
+    images: [String],
+    kitchen_msg_id: String,
+    rating: { type: Number, default: 0 },
+    feedback: { type: String, default: "" },
+    rated: { type: Boolean, default: false },
+    backup_msg_id: String
+});
+
+const VIPCodeSchema = new mongoose.Schema({
+    code: { type: String, unique: true },
+    is_used: { type: Boolean, default: false }
+});
+
+const ScriptSchema = new mongoose.Schema({
+    user_id: String,
+    script: String
+});
+
+const BlacklistSchema = new mongoose.Schema({
+    guild_id: String,
+    reason: String,
+    authorized_by: String
+});
+
+const ConfigSchema = new mongoose.Schema({
+    id: { type: String, default: 'main' },
+    last_quota_run: { type: Date, default: new Date(0) }
+});
+
+// 2. PANEL-SPECIFIC SCHEMAS (For Web Auth & Modmail)
 const StaffSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true }, 
     role: { type: String, default: 'Staff', enum: ['Owner', 'Staff'] }, 
     discordId: { type: String, default: null } 
 });
-const WebStaff = mongoose.model('WebStaff', StaffSchema);
 
 const ThreadSchema = new mongoose.Schema({
     userId: String,
@@ -86,14 +138,16 @@ const ThreadSchema = new mongoose.Schema({
         timestamp: { type: Date, default: Date.now }
     }]
 });
-const Thread = mongoose.model('Thread', ThreadSchema);
 
-const BlacklistSchema = new mongoose.Schema({
-    guild_id: String,
-    reason: String,
-    authorized_by: String
-});
+// --- MODEL COMPILATION ---
+const User = mongoose.model('User', UserSchema);
+const Order = mongoose.model('Order', OrderSchema);
+const VIPCode = mongoose.model('VIPCode', VIPCodeSchema);
+const Script = mongoose.model('Script', ScriptSchema);
 const ServerBlacklist = mongoose.model('ServerBlacklist', BlacklistSchema);
+const SystemConfig = mongoose.model('SystemConfig', ConfigSchema);
+const WebStaff = mongoose.model('WebStaff', StaffSchema);
+const Thread = mongoose.model('Thread', ThreadSchema);
 
 // --- DB CONNECTION ---
 mongoose.connect(MONGO_URI).then(async () => {
@@ -397,7 +451,12 @@ app.post('/mail/:threadId/archive', isStaff, async (req, res) => {
 app.post('/warn', isStaff, async (req, res) => {
     const { target_id, action } = req.body;
     const userData = await User.findOne({ user_id: target_id }) || new User({ user_id: target_id });
-    if (action === 'add') { userData.warnings += 1; if (userData.warnings >= 9) userData.is_perm_banned = true; }
+    if (action === 'add') { 
+        userData.warnings += 1; 
+        if (userData.warnings === 3) userData.service_ban_until = new Date(Date.now() + 7 * 86400000);
+        else if (userData.warnings === 6) userData.service_ban_until = new Date(Date.now() + 30 * 86400000);
+        else if (userData.warnings >= 9) userData.is_perm_banned = true; 
+    }
     else if (action === 'clear') { userData.warnings = 0; userData.is_perm_banned = false; userData.service_ban_until = null; }
     await userData.save();
     res.redirect('/dashboard');
