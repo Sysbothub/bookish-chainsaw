@@ -1,9 +1,73 @@
-<!DOCTYPE html><html><head><title>Admin</title><link rel="stylesheet" href="/style.css"></head>
-<body><div class="layout"><%- include('partials/sidebar') %><div class="content">
-    <h1>Staff Access</h1>
-    <div style="display:flex; gap:20px;">
-        <div class="card" style="flex:1"><h3>Create Local</h3><form action="/admin/create-local" method="POST"><input name="username" placeholder="User"><input name="password" placeholder="Pass"><select name="role"><option>Staff</option><option>Management</option><option>Admin</option></select><button>Create</button></form></div>
-        <div class="card" style="flex:1"><h3>Authorize ID</h3><form action="/admin/create-discord" method="POST"><input name="discord_id" placeholder="Discord ID"><select name="role"><option>Staff</option><option>Management</option><option>Admin</option></select><button style="background:#5865F2">Auth</button></form></div>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="layout">
+        <%- include('partials/sidebar') %>
+        <div class="content">
+            <h1>Staff Access</h1>
+            
+            <div style="display:flex; gap:20px; margin-bottom: 20px;">
+                <div class="card" style="flex:1">
+                    <h3>Create Local</h3>
+                    <form action="/admin/create-local" method="POST">
+                        <input name="username" placeholder="User" required>
+                        <input name="password" placeholder="Pass" required>
+                        <select name="role">
+                            <option>Staff</option>
+                            <option>Management</option>
+                            <option>Admin</option>
+                        </select>
+                        <button>Create</button>
+                    </form>
+                </div>
+
+                <div class="card" style="flex:1">
+                    <h3>Authorize ID</h3>
+                    <form action="/admin/create-discord" method="POST">
+                        <input name="discord_id" placeholder="Discord ID" required>
+                        <select name="role">
+                            <option>Staff</option>
+                            <option>Management</option>
+                            <option>Admin</option>
+                        </select>
+                        <button style="background:#5865F2">Auth</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Staff List (Change Roles)</h3>
+                <ul style="list-style: none; padding: 0;">
+                    <% staff.forEach(s => { %>
+                        <li style="display:flex; justify-content:space-between; align-items:center; padding: 10px; border-bottom: 1px solid #444;">
+                            
+                            <div style="font-weight: bold;">
+                                <%= s.username %> 
+                                <span style="font-weight:normal; font-size:0.8em; color:#aaa;">(<%= s.role %>)</span>
+                            </div>
+                            
+                            <form action="/admin/update-role" method="POST" style="margin:0;">
+                                <input type="hidden" name="staff_id" value="<%= s._id %>">
+                                <select name="new_role" onchange="this.form.submit()" style="padding: 5px; border-radius: 4px; background: #222; color: white; border: 1px solid #555;">
+                                    <option value="Staff" <%= s.role === 'Staff' ? 'selected' : '' %>>Staff</option>
+                                    <option value="Management" <%= s.role === 'Management' ? 'selected' : '' %>>Management</option>
+                                    <option value="Senior" <%= s.role === 'Senior' ? 'selected' : '' %>>Senior</option>
+                                    <option value="Admin" <%= s.role === 'Admin' ? 'selected' : '' %>>Admin</option>
+                                    
+                                    <% if((user && user.role === 'Owner') || s.role === 'Owner') { %>
+                                        <option value="Owner" <%= s.role === 'Owner' ? 'selected' : '' %>>Owner</option>
+                                    <% } %>
+                                </select>
+                            </form>
+                        </li>
+                    <% }) %>
+                </ul>
+            </div>
+        </div>
     </div>
-    <div class="card"><h3>List</h3><ul><% staff.forEach(s => { %><li><%= s.username %> (<%= s.role %>)</li><% }) %></ul></div>
-</div></div></body></html>
+</body>
+</html>
