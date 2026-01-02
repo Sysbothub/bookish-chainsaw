@@ -46,13 +46,12 @@ app.use(passport.initialize());
 app.use(passport.session());
 app.use(flash());
 
-// --- [FIX START] GLOBAL USER MIDDLEWARE ---
-// This injects the logged-in user into EVERY view (sidebar, admin, etc.)
+// --- GLOBAL USER MIDDLEWARE (Fixes Sidebar Error) ---
 app.use((req, res, next) => {
     res.locals.user = req.user || null;
     next();
 });
-// --- [FIX END] ----------------------------
+// ----------------------------------------------------
 
 // ==================================================================
 // 2. HYBRID AUTHENTICATION
@@ -204,6 +203,25 @@ app.post('/admin/create-discord', check(['Admin', 'Owner']), async (req, res) =>
     try { await Staff.create({ username: `Discord_${req.body.discord_id.substr(-4)}`, discordId: req.body.discord_id, role: req.body.role }); res.redirect('/admin'); } 
     catch(e) { res.send("ID taken"); }
 });
+
+// --- NEW ROUTE: UPDATE ROLES ---
+app.post('/admin/update-role', check(['Admin', 'Owner']), async (req, res) => {
+    try {
+        const { staff_id, new_role } = req.body;
+        const target = await Staff.findById(staff_id);
+        
+        // Security: Prevent lower ranks from messing with the Owner
+        if (target.role === 'Owner' && req.user.role !== 'Owner') {
+            return res.send("❌ You cannot modify the Owner's permissions.");
+        }
+        
+        target.role = new_role;
+        await target.save();
+        res.redirect('/admin');
+    } catch(e) { res.send("Error updating role"); }
+});
+// -------------------------------
+
 app.post('/add-vip', check(['Owner']), async (req, res) => {
     const date = new Date(); date.setDate(date.getDate() + 30);
     await User.updateOne({ user_id: req.body.target_id }, { vip_until: date });
