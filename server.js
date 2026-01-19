@@ -9,7 +9,8 @@ const flash = require('connect-flash');
 const bcrypt = require('bcrypt');
 const http = require('http');
 const socketIo = require('socket.io');
-const { Client, GatewayIntentBits, ChannelType, Partials } = require('discord.js');
+// [UPDATED] Added EmbedBuilder to imports
+const { Client, GatewayIntentBits, ChannelType, Partials, EmbedBuilder } = require('discord.js');
 
 const { User, Order, Staff, Thread, Blacklist } = require('./schemas');
 
@@ -40,6 +41,7 @@ initOwner();
 
 // MIDDLEWARE
 app.set('view engine', 'ejs');
+app.use(express.json()); 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 app.use(session({ secret: 'sugar_panel_secure', resave: false, saveUninitialized: false }));
@@ -108,6 +110,50 @@ const check = (roles) => (req, res, next) => {
 // ==================================================================
 // 3. ROUTES
 // ==================================================================
+
+// [UPDATED] TOP.GG VOTE WEBHOOK WITH CHANNEL LOGGING
+app.post('/vote-webhook', async (req, res) => {
+    // 1. Verify Authorization Header (Security)
+    if (req.headers.authorization !== process.env.TOPGG_WEBHOOK_AUTH) {
+        return res.status(401).send('Unauthorized');
+    }
+
+    // 2. Extract User ID from Webhook Body
+    const voterId = req.body.user;
+
+    try {
+        // 3. Fetch User
+        const user = await client.users.fetch(voterId).catch(() => null);
+        
+        if (user) {
+            // A. Send Thank You DM
+            await user.send("🎉 **Thank you for voting for Sugar Rush!** Your support helps us grow.").catch(() => {});
+            
+            // B. Log to Special Channel (NEW)
+            if (process.env.VOTE_LOG_CHANNEL_ID) {
+                const logChannel = client.channels.cache.get(process.env.VOTE_LOG_CHANNEL_ID);
+                if (logChannel) {
+                    const embed = new EmbedBuilder()
+                        .setTitle("🗳️ New Vote Received!")
+                        .setDescription(`**${user.username}** just voted for Sugar Rush on Top.gg!`)
+                        .setColor(0xFFA500) // Orange
+                        .setTimestamp()
+                        .setThumbnail(user.displayAvatarURL());
+                    
+                    await logChannel.send({ embeds: [embed] });
+                    console.log(`✅ Logged Vote for ${user.username}`);
+                } else {
+                    console.error("❌ Vote Log Channel not found. Check ID.");
+                }
+            }
+        }
+    } catch (error) {
+        console.error(`❌ Vote Webhook Error: ${error.message}`);
+    }
+
+    res.status(200).send('Vote Received');
+});
+// ----------------------------------------------------
 
 app.get('/', (req, res) => {
     if(req.isAuthenticated()) return res.redirect('/dashboard');
